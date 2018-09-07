@@ -58,7 +58,7 @@ def evaluate(classifier, data_files, hyper_pars):
         input_fn=lambda: make_iterators(
             data_files['test'], hyper_pars['batch_size']
         ),
-        steps=100,
+        steps=1000,
     )
     LOGGER.info('\nEval:')
     LOGGER.info('acc: {accuracy:0.3f},'

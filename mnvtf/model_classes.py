@@ -1,3 +1,4 @@
+import logging
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.layers import Conv2D
@@ -7,6 +8,9 @@ from tensorflow.keras.layers import Flatten
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import concatenate
 from tensorflow.keras.layers import BatchNormalization
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class ConvModel(keras.Model):
@@ -40,6 +44,7 @@ class ConvModel(keras.Model):
         self.dense_1 = Dense(96, activation='relu')
         self.dropout2 = Dropout(0.5)
         self.dense_2 = Dense(num_classes)
+        LOGGER.info('initialized ConvModel')
 
     def call(self, x_inputs, u_inputs, v_inputs):
         # define forward pass using layers defined in `__init__`

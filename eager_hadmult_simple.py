@@ -8,6 +8,9 @@ from __future__ import print_function
 
 import argparse
 import os
+import logging
+import time
+import datetime
 import tensorflow as tf
 
 from mnvtf.model_classes import ConvModel
@@ -21,9 +24,23 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--batch-size', default=100, type=int, help='batch size')
 parser.add_argument('--num-epochs', default=1, type=int,
                     help='number of training epochs')
-parser.add_argument('--data-dir', default='', type=str, help='data dir')
+parser.add_argument('--train-file', default='', type=str,
+                    help='full path to train file')
+parser.add_argument('--eval-file', default='', type=str,
+                    help='full path to evaluation file')
 parser.add_argument('--model-dir', default='fashion', type=str,
                     help='model dir')
+
+tf.logging.set_verbosity(tf.logging.INFO)
+logfilename = 'log_' + __file__.split('/')[-1].split('.')[0] \
+    + str(int(time.time())) + '.txt'
+logging.basicConfig(
+    filename=logfilename, level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+LOGGER = logging.getLogger(__name__)
+LOGGER.info("Starting...")
+LOGGER.info(__file__)
 
 
 def loss(model, x, u, v, y):
@@ -52,7 +69,9 @@ def train(
             )
             tf.contrib.summary.scalar('loss', train_loss)
             if i % 20 == 0:
-                print('loss at step {:03d}: {:.3f}'.format(i, train_loss))
+                LOGGER.info(
+                    'loss at step {:03d}: {:.3f}'.format(i, train_loss)
+                )
                 checkpoint.save(file_prefix=checkpoint_prefix)
             if i > 40:
                 break   # short test for now...
@@ -71,28 +90,24 @@ def test(model, dataset):
             tf.argmax(labels, axis=1, output_type=tf.int32)
         )
 
-    print('Test set: Average loss: %.4f, Accuracy: %4f%%\n' %
-          (avg_loss.result(), 100 * accuracy.result()))
+    LOGGER.info('Test set: Average loss: %.4f, Accuracy: %4f%%\n' %
+                (avg_loss.result(), 100 * accuracy.result()))
     # need a separate writer (either `with`or as default) to keep distinct
     # with tf.contrib.summary.always_record_summaries():
     #     tf.contrib.summary.scalar('loss', avg_loss.result())
     #     tf.contrib.summary.scalar('accuracy', accuracy.result())
 
 
-def main(batch_size, num_epochs, data_dir, model_dir):
+def main(batch_size, num_epochs, train_file, eval_file, model_dir):
     if num_epochs != 1:
         print(__doc__)
         import sys
         sys.exit(1)
     tf.enable_eager_execution()
 
-    # Get path to data
-    TESTFILE = os.path.join(data_dir, 'hadmultkineimgs_mnvvtx_test.hdf5')
-    TRAINFILE = os.path.join(data_dir, 'hadmultkineimgs_mnvvtx_train.hdf5')
-
     model = ConvModel()
     dataset = make_dset(
-        TRAINFILE, batch_size, num_epochs=num_epochs, shuffle=True
+        train_file, batch_size, num_epochs=num_epochs, shuffle=True
     )
 
     optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
@@ -110,16 +125,21 @@ def main(batch_size, num_epochs, data_dir, model_dir):
     checkpoint.restore(tf.train.latest_checkpoint(model_dir))
 
     _, labels, x, u, v = iter(dataset).next()
-    print('initial loss: {:.3f}'.format(loss(model, x, u, v, labels)))
+    LOGGER.info('initial loss: {:.3f}'.format(loss(model, x, u, v, labels)))
 
     # training loop
     with writer.as_default():
+        t0 = time.perf_counter()
         train(
             model, optimizer, dataset, global_step,
             checkpoint, checkpoint_prefix
         )
+        t1 = time.perf_counter()
+        LOGGER.info(' epoch train time: {}'.format(
+            str(datetime.timedelta(seconds=t1-t0))
+        ))
 
-    test_dataset = make_dset(TESTFILE, batch_size, num_epochs=1)
+    test_dataset = make_dset(eval_file, batch_size, num_epochs=1)
     test(model, test_dataset)
 
 

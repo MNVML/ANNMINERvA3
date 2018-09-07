@@ -76,14 +76,3 @@ def make_iterators(
     features['v_img'] = v_img
     features['eventids'] = eventids
     return features, labels
-
-
-def get_data_files_dict(path='path_to_data'):
-    data_dict = {}
-    data_dict['train'] = os.path.join(
-        path, 'hadmultkineimgs_mnvvtx_train.hdf5'
-    )
-    data_dict['test'] = os.path.join(
-        path, 'hadmultkineimgs_mnvvtx_test.hdf5'
-    )
-    return data_dict

@@ -3,10 +3,12 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
+import logging
+import time
+import datetime
 import tensorflow as tf
 
 from mnvtf.data_readers import make_iterators
-from mnvtf.data_readers import get_data_files_dict
 from mnvtf.estimator_fns import est_model_fn
 
 
@@ -16,9 +18,23 @@ parser.add_argument('--train-steps', default=None, type=int,
                     help='number of training steps')
 parser.add_argument('--num-epochs', default=1, type=int,
                     help='number of epochs')
-parser.add_argument('--data-dir', default='', type=str, help='data dir')
+parser.add_argument('--train-file', default='', type=str,
+                    help='full path to train file')
+parser.add_argument('--eval-file', default='', type=str,
+                    help='full path to evaluation file')
 parser.add_argument('--model-dir', default='fashion', type=str,
                     help='model dir')
+
+tf.logging.set_verbosity(tf.logging.INFO)
+logfilename = 'log_' + __file__.split('/')[-1].split('.')[0] \
+    + str(int(time.time())) + '.txt'
+logging.basicConfig(
+    filename=logfilename, level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+LOGGER = logging.getLogger(__name__)
+LOGGER.info("Starting...")
+LOGGER.info(__file__)
 
 
 def predict(classifier, data_files, hyper_pars):
@@ -30,8 +46,8 @@ def predict(classifier, data_files, hyper_pars):
     )
     counter = 0
     for p in predictions:
-        # TODO? - add persistency mechanism for predictions
-        print(p)
+        # TODO - add persistency mechanism for predictions
+        LOGGER.info(str(p))
         counter += 1
         if counter > 10:
             break
@@ -44,10 +60,12 @@ def evaluate(classifier, data_files, hyper_pars):
         ),
         steps=100,
     )
-    print('\nEval:')
-    print('acc: {accuracy:0.3f}, loss: {loss:0.3f}, MPCA {mpca:0.3f}'.format(
-        **eval_result
-    ))
+    LOGGER.info('\nEval:')
+    LOGGER.info('acc: {accuracy:0.3f},'
+                ' loss: {loss:0.3f},'
+                ' MPCA {mpca:0.3f}'.format(
+                    **eval_result
+                ))
 
 
 def train_one_epoch(classifier, data_files, hyper_pars):
@@ -61,17 +79,24 @@ def train_one_epoch(classifier, data_files, hyper_pars):
 
 def train(classifier, data_files, hyper_pars):
     for i in range(hyper_pars['num_epochs']):
-        print('training epoch {}'.format(i))
+        LOGGER.info('training epoch {}'.format(i))
+        t0 = time.perf_counter()
         train_one_epoch(classifier, data_files, hyper_pars)
-        print('evaluation after epoch {}'.format(i))
+        t1 = time.perf_counter()
+        LOGGER.info(' epoch train time: {}'.format(
+            str(datetime.timedelta(seconds=t1-t0))
+        ))
+        LOGGER.info('evaluation after epoch {}'.format(i))
         evaluate(classifier, data_files, hyper_pars)
 
 
 def main(
-    batch_size, train_steps, num_epochs, data_dir, model_dir
+    batch_size, train_steps, num_epochs, train_file, eval_file, model_dir
 ):
 
-    data_files = get_data_files_dict(path=data_dir)
+    data_files = {}
+    data_files['train'] = train_file
+    data_files['test'] = eval_file
     hyper_pars = {}
     hyper_pars['batch_size'] = batch_size
     hyper_pars['num_epochs'] = num_epochs
@@ -89,8 +114,17 @@ def main(
         params={},
         config=run_config
     )
+    t0 = time.perf_counter()
     train(classifier, data_files, hyper_pars)
+    t1 = time.perf_counter()
+    LOGGER.info(' total train time: {}'.format(
+        str(datetime.timedelta(seconds=t1-t0))
+    ))
     predict(classifier, data_files, hyper_pars)
+    t1 = time.perf_counter()
+    LOGGER.info(' total run time: {}'.format(
+        str(datetime.timedelta(seconds=t1-t0))
+    ))
 
 
 if __name__ == '__main__':

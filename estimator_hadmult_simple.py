@@ -10,6 +10,7 @@ import tensorflow as tf
 
 from mnvtf.data_readers import make_iterators
 from mnvtf.estimator_fns import est_model_fn
+from mnvtf.recorder_text import MnvCategoricalTextRecorder as Recorder
 
 
 parser = argparse.ArgumentParser()
@@ -44,13 +45,10 @@ def predict(classifier, data_files, hyper_pars):
             data_files['test'], hyper_pars['batch_size']
         ),
     )
-    counter = 0
+    recorder = Recorder(hyper_pars['predictions_file'])
     for p in predictions:
-        # TODO - add persistency mechanism for predictions
-        LOGGER.info(str(p))
-        counter += 1
-        if counter > 10:
-            break
+        recorder.write_data(p)
+    recorder.close()
 
 
 def evaluate(classifier, data_files, hyper_pars):
@@ -93,6 +91,7 @@ def train(classifier, data_files, hyper_pars):
 def main(
     batch_size, train_steps, num_epochs, train_file, eval_file, model_dir
 ):
+    import os
 
     data_files = {}
     data_files['train'] = train_file
@@ -101,6 +100,10 @@ def main(
     hyper_pars['batch_size'] = batch_size
     hyper_pars['num_epochs'] = num_epochs
     hyper_pars['train_steps'] = train_steps
+    # TODO - pass in predictions output path
+    hyper_pars['predictions_file'] = os.path.join(
+        model_dir, 'predictions'
+    )
 
     run_config = tf.estimator.RunConfig(
         save_checkpoints_steps=10,
